@@ -2,66 +2,21 @@
 export compile_commands, libcimplot
 
 using CImGui_jll
-## Global variables
-PATH = ""
-LIBPATH = ""
-LIBPATH_env = "PATH"
-LIBPATH_default = ""
-
-# Relative path to `compile_commands`
-const compile_commands_splitpath = ["share", "compile_commands.json"]
-
-# This will be filled out by __init__() for all products, as it must be done at runtime
-compile_commands_path = ""
-
-# compile_commands-specific global declaration
-# This will be filled out by __init__()
-compile_commands = ""
-
-
-# Relative path to `libcimplot`
-const libcimplot_splitpath = ["bin", "libcimplot.dll"]
-
-# This will be filled out by __init__() for all products, as it must be done at runtime
-libcimplot_path = ""
-
-# libcimplot-specific global declaration
-# This will be filled out by __init__()
-libcimplot_handle = C_NULL
-
-# This must be `const` so that we can use it with `ccall()`
-const libcimplot = "libcimplot.dll"
-
-
-"""
-Open all libraries
-"""
+JLLWrappers.@generate_wrapper_header("CImPlot")
+JLLWrappers.@declare_file_product(compile_commands)
+JLLWrappers.@declare_library_product(libcimplot, "libcimplot.dll")
 function __init__()
-    global artifact_dir = abspath(artifact"CImPlot")
+    JLLWrappers.@generate_init_header(CImGui_jll)
+    JLLWrappers.@init_file_product(
+        compile_commands,
+        "share\\compile_commands.json",
+    )
 
-    # Initialize PATH and LIBPATH environment variable listings
-    global PATH_list, LIBPATH_list
-    # From the list of our dependencies, generate a tuple of all the PATH and LIBPATH lists,
-    # then append them to our own.
-    foreach(p -> append!(PATH_list, p), (CImGui_jll.PATH_list,))
-    foreach(p -> append!(LIBPATH_list, p), (CImGui_jll.LIBPATH_list,))
+    JLLWrappers.@init_library_product(
+        libcimplot,
+        "bin\\libcimplot.dll",
+        RTLD_LAZY | RTLD_DEEPBIND,
+    )
 
-    global compile_commands_path = normpath(joinpath(artifact_dir, compile_commands_splitpath...))
-
-    global compile_commands = compile_commands_path
-    global libcimplot_path = normpath(joinpath(artifact_dir, libcimplot_splitpath...))
-
-    # Manually `dlopen()` this right now so that future invocations
-    # of `ccall` with its `SONAME` will find this path immediately.
-    global libcimplot_handle = dlopen(libcimplot_path)
-    push!(LIBPATH_list, dirname(libcimplot_path))
-
-    # Filter out duplicate and empty entries in our PATH and LIBPATH entries
-    filter!(!isempty, unique!(PATH_list))
-    filter!(!isempty, unique!(LIBPATH_list))
-    global PATH = join(PATH_list, ';')
-    global LIBPATH = join(vcat(LIBPATH_list, [Sys.BINDIR, joinpath(Sys.BINDIR, Base.LIBDIR, "julia"), joinpath(Sys.BINDIR, Base.LIBDIR)]), ';')
-
-    
+    JLLWrappers.@generate_init_footer()
 end  # __init__()
-
